@@ -1,8 +1,8 @@
 from loghelper import LogHelper
 import numpy as np
+from ctypes import *
 # if c cypes do not work, use python version. But slower 1000 times
 # from tracehelper.levenshtein import Levenshtein as lvst
-from ctypes import *
 
 
 LOG = LogHelper.AppLog().LOGGER
@@ -20,7 +20,7 @@ class Trace:
         self.NormControllerLogDict = {}
 
         # define private attr
-        self._dllObj = CDLL('./ctypes/test.dll')
+        self._dllObj = CDLL('./tracehelper/levenshtein.dll')
         self._dllObj.similarity.argtypes = (c_char_p, c_char_p)
         self._dllObj.similarity.restype = c_float
         self._similarity = self._dllObj.similarity

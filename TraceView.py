@@ -3,9 +3,6 @@ from tracehelper.tracehelper import Trace
 from matplotlib import pyplot as plt
 
 
-
-
-
 if __name__ == '__main__':
     # Initial log
     LOG = LogHelper.AppLog().LOGGER
@@ -14,7 +11,7 @@ if __name__ == '__main__':
     # trace = Trace([r'./test_data/c.log'])
 
     ###############################
-    ## develop
+    # develop
     _select = 'actimas/dmc'
 
     list = trace.normalize_controller_log_dict(_select, suggestion=True)

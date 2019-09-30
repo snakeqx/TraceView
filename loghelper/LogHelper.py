@@ -26,14 +26,13 @@ class AppLog:
         self.LOGGER = logging.getLogger()
         # private attr
         self._log_formatter = logging.Formatter('%(asctime)s | %(filename)s | [line:%(lineno)d] | '
-                                                '%(levelname)s | %(message)s')  # ,
-                                                # datefmt='%Y-%m-%d %H:%M:%S')
+                                                '%(levelname)s | %(message)s')
         self._log_level = logging.DEBUG
         self._console_handler = logging.StreamHandler()
         self._file_handler = logging.FileHandler(r'./log.txt', mode='w')
-        self._enable_handler(self.IsConsoleOutput, self.IsLogFileOutput)
+        self._enable_handler()
 
-    def _enable_handler(self, to_console:bool, to_file:bool):
+    def _enable_handler(self):
         self.LOGGER.setLevel(self._log_level)
         if self.IsLogFileOutput is True:        
             self._file_handler.setLevel(self._log_level)
@@ -50,11 +49,3 @@ class AppLog:
 
     def enable_log(self):
         self.IsLogEnable = True
-
-
-        
-
-
-
-       
-
