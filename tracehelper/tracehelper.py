@@ -1,16 +1,26 @@
 from loghelper import LogHelper
 import numpy as np
+import sys
+import time
 from ctypes import *
-# if c cypes do not work, use python version. But slower 1000 times
-# from tracehelper.levenshtein import Levenshtein as lvst
 
 
 LOG = LogHelper.AppLog().LOGGER
 
 
+def debug_runtime(func):
+    def wrapper(self, *args, **kwargs):
+        start = time.time()
+        u = func(self, *args, **kwargs)
+        end = time.time()
+        LOG.debug("function {} running time is {:.2f}s".format(func.__name__, end - start))
+        return u
+    return wrapper
+
+
 class Trace:
 
-    def __init__(self, file_name: list):
+    def __init__(self, file_name: list, force_py: bool = False):
         LOG.debug("start construction of Trace class")
         # define class attr
         LOG.debug('input parameter type is:' + str(type(file_name)))
@@ -20,10 +30,7 @@ class Trace:
         self.NormControllerLogDict = {}
 
         # define private attr
-        self._dllObj = CDLL('./tracehelper/levenshtein.dll')
-        self._dllObj.similarity.argtypes = (c_char_p, c_char_p)
-        self._dllObj.similarity.restype = c_float
-        self._similarity = self._dllObj.similarity
+        self._import_levenshtein(force_py)
 
         # logic
         self.read_files()
@@ -40,39 +47,35 @@ class Trace:
                     self._parse_line(line, each_file)
         self._init_controller_dict()
 
+    @debug_runtime
     def normalize_controller_log_dict(self, controller_name: str, similarity: float = 0.7, suggestion: bool = False):
-        _checked_name = self._check_controller_name(controller_name, suggestion)
-        if _checked_name is None:
+        checked_name = self._check_controller_name(controller_name, suggestion)
+        if checked_name is None:
             LOG.error("controller name not found")
             return
 
         # logic
-        _id = 0
+        _log_id = 0
         _result = []
         _log_list = []
         _compare_len = 30
-        for index, log in enumerate(self.LogControllerDict[_checked_name]):
-            print('\r {0}/{1}'.format(index, len(self.LogControllerDict[_checked_name])), end='')
+        for index, log in enumerate(self.LogControllerDict[checked_name]):
+            print('\r {0}/{1}'.format(index + 1, len(self.LogControllerDict[checked_name])), end='')
             # handle the 1st log
             if len(_log_list) == 0:
                 _log_list.append(log)
-                _result.append(_id)
-                _id += 1
+                _result.append(_log_id)
+                _log_id += 1
                 continue
             # handle the rest
             dp = np.zeros(len(_log_list))
             for index2, comp in enumerate(_log_list):
-                # dp[index2] = lvst.similarity(comp[:_compare_len], log[:_compare_len])
                 dp[index2] = self._similarity(comp[:_compare_len].encode('ascii'), log[:_compare_len].encode('ascii'))
             if np.max(dp) < similarity:
-                # LOG.debug('compare id:\t{0}\t{1}...'
-                # .format(_id, log[:_compare_len] if len(log) > _compare_len else log))
                 _log_list.append(log)
-                _result.append(_id)
-                _id += 1
+                _result.append(_log_id)
+                _log_id += 1
             else:
-                # LOG.debug('compare id:\t{0}\t{1}...'
-                # .format(np.argmax(dp), log[:_compare_len] if len(log) > _compare_len else log))
                 _result.append(np.argmax(dp))
         return _result
 
@@ -82,12 +85,12 @@ class Trace:
         _code = 2
         _msg = 3
         for index, log in enumerate(self.TraceLogList):
-            print('\r processing controller dictionary init: {0}/{1}'.format(index+1, len(self.TraceLogList)), end='')
+            print('\r processing _controller dictionary init: {0}/{1}'.format(index+1, len(self.TraceLogList)), end='')
             if log[_controller] not in self.LogControllerDict:
                 self.LogControllerDict[log[_controller]] = [log[_msg]]
             else:
                 self.LogControllerDict[log[_controller]].append(log[_msg])
-        print('\n controller dictionary init done\n')
+        print('\n _controller dictionary init done\n')
 
     def _check_controller_name(self, controller_name: str, suggestion: bool):
         if controller_name in self.LogControllerDict.keys():
@@ -96,13 +99,11 @@ class Trace:
         if suggestion:
             dp = np.zeros(len(self.LogControllerDict))
             for index, name in enumerate(self.LogControllerDict):
-                # dp[index] = lvst.similarity(controller_name.upper(), name.upper())
                 dp[index] = self._similarity(controller_name.upper().encode('ascii'),
                                              name.upper().encode('ascii'))
                 LOG.debug("compare to strings: {0} vs {1} \t\t\t\t=> Similarity={2}"
                           .format(controller_name.upper(), name.upper(), dp[index]))
             _max_index = int(np.argmax(dp))
-            LOG.debug("max index = {0}, type={1}".format(_max_index, type(_max_index)))
             LOG.debug('all controller names listed here: {0}'.format(self.LogControllerDict.keys()))
             _result_name = list(self.LogControllerDict.keys())[_max_index]
             LOG.warning("no controller named \"{0}\". do you mean \"{1}\""
@@ -125,6 +126,31 @@ class Trace:
             self.TraceLogList.append((time, splits[0].replace(' ', ''), splits[0], splits[0]))
             LOG.warning("Split line with only 1 part in file " + file_name)
             LOG.warning('. Parsed as' + str(self.TraceLogList[-1]))
+
+    def _import_levenshtein(self, force_py: bool):
+        if force_py:
+            LOG.info("force_py enabled. Python levenshtein will be used.")
+            import tracehelper.levenshtein
+            self._similarity = tracehelper.levenshtein.similarity
+            return
+        platform = sys.platform
+        if platform == 'win32/64':
+            self._dllObj = CDLL('./tracehelper/levenshtein.dll')
+        elif platform == 'darwin':
+            self._dllObj = CDLL('./tracehelper/levenshtein.dylib')
+        else:
+            self._dllObj = CDLL('./tracehelper/levenshtein.so')
+        try:
+            self._dllObj.similarity.argtypes = (c_char_p, c_char_p)
+            self._dllObj.similarity.restype = c_float
+            self._similarity = self._dllObj.similarity
+        except Exception as e:
+            LOG.error("C dynamic lib cannot be imported. Python version will be imported. "
+                      "The reason is: " + str(e))
+            import tracehelper.levenshtein
+            self._similarity = tracehelper.levenshtein.similarity
+
+
 
 
 if __name__ == '__main__':

@@ -1,11 +1,12 @@
-/*********************************************************************************/
-/* This is the c version of levenshtein algorithm which is used to calc similarity
-/* of 2 strings.
-/* Compared to the python version, this is really much faster
-/*
-/* compile to dll:
-/* gcc -fPIC -shared levenshtein.c -o levenshtein.dll
-/*********************************************************************************/
+/*********************************************************************************
+ This is the c version of levenshtein algorithm which is used to calc similarity
+ of 2 strings.
+ Compared to the python version, this is really much faster
+
+ compile to dll:
+ gcc -fPIC -shared levenshtein.c -o levenshtein.dll
+*********************************************************************************/
+
 
 #include <string.h>
 #define MIN(x,y) (x)>(y)?(y):(x)

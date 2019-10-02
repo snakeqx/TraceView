@@ -12,8 +12,8 @@ if __name__ == '__main__':
 
     ###############################
     # develop
-    _select = 'actimas/dmc'
+    _select = 'actimas/phs'
 
-    list = trace.normalize_controller_log_dict(_select, suggestion=True)
-    plt.plot(list)
+    my_list = trace.normalize_controller_log_dict(_select, suggestion=True)
+    plt.plot(my_list)
     plt.show()
